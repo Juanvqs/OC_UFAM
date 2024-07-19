@@ -1,0 +1,150 @@
+import sys
+
+# Registradores
+registradores = {
+    'r0': '00',
+    'r1': '01',
+    'r2': '10',
+    'r3': '11'
+}
+
+# Operações, adicionando as que foram solicitadas
+operacoes = {
+    'add': '1000',
+    'shr': '1001',
+    'shl': '1010',
+    'not': '1011',
+    'and': '1100',
+    'or': '1101',
+    'xor': '1110',
+    'cmp': '1111',
+    'ld': '0000',
+    'st': '0001',
+    'data': '0010 00',
+    'jmpr': '0011 00',
+    'jmp': '0100 0000',
+    'clf': '0110 0000',
+    'in': '0111 0',
+    'out': '0111 1',
+    'swap': '1011',  # Definindo swap
+    'halt': '1111111111111111'  # Definindo halt
+}
+
+# Operações do JCAEZ
+jcaez_operacoes = {
+    'jc': '0101 1000',
+    'ja': '0101 0100',
+    'je': '0101 0010',
+    'jz': '0101 0001',
+    'jca': '0101 1100',
+    'jce': '0101 1010',
+    'jcz': '0101 1001',
+    'jae': '0101 0110',
+    'jaz': '0101 0101',
+    'jez': '0101 0011',
+    'jcae': '0101 1110',
+    'jcaz': '0101 1101',
+    'jcez': '0101 1011',
+    'jaez': '0101 0111',
+    'jcaez': '0101 1111'
+}
+
+# Remover comentários e linhas vazias da entrada
+def ler_arquivo_fonte(caminho_arquivo):
+    with open(caminho_arquivo, 'r') as arquivo:
+        linhas = arquivo.readlines()
+    return [linha.strip().lower() for linha in linhas se linha.strip() e não linha.startswith(';')]
+
+# Divide uma linha em instrução e operandos
+def dividir_linha(linha):
+    partes = linha.split()
+    se len(partes) == 0:
+        return Nenhum, Nenhum
+    
+    instrucao = partes[0].lower()
+    operandos = []
+    
+    se len(partes) > 1:
+        operandos_str = ' '.join(partes[1:])
+        operandos = [op.strip() para op em operandos_str.split(',')]
+    
+    return instrucao, operandos
+
+# Converter instruções e operandos em código binário
+def converter_para_codigo_maquina(linhas):
+    codigo_maquina = []
+    para linha em linhas:
+        instrucao, operandos = dividir_linha(linha)
+        se instrucao em operacoes:
+            se instrucao em ['in', 'out']:
+                se operandos[0] == 'data':
+                    codigo_op = operacoes[instrucao] + '0' + registradores[operandos[1]]
+                elif operandos[0] == 'addr' ou operandos[0] == 'address':
+                    codigo_op = operacoes[instrucao] + '1' + registradores[operandos[1]]
+                codigo_maquina.append(codigo_op)
+            elif instrucao em ['swap']:
+                troca1 = operacoes['xor'] + registradores[operandos[0]] + registradores[operandos[1]]
+                troca2 = operacoes['xor'] + registradores[operandos[1]] + registradores[operandos[0]]
+                codigo_maquina.append(troca1)
+                codigo_maquina.append(troca2)
+                codigo_maquina.append(troca1)
+            elif instrucao em ['halt']:
+                codigo_maquina.append(operacoes['halt'])
+            elif instrucao == 'data':
+                se operandos[1].startswith('0x'):
+                    valor = int(operandos[1], 16)
+                elif operandos[1].startswith('0b'):
+                    valor = int(operandos[1], 2)
+                else:
+                    valor = int(operandos[1])
+                codigo_maquina.append(operacoes[instrucao] + registradores[operandos[0]])
+                codigo_maquina.append(format(valor, '08b'))
+            else:
+                codigo_op = operacoes[instrucao] + registradores[operandos[0]] + registradores[operandos[1]]
+                codigo_maquina.append(codigo_op)
+        elif instrucao em jcaez_operacoes:
+            se operandos[0].startswith('0x'):
+                endereco = int(operandos[0], 16)
+            elif operandos[0].startswith('0b'):
+                endereco = int(operandos[0], 2)
+            else:
+                endereco = int(operandos[0])
+            codigo_maquina.append(jcaez_operacoes[instrucao])
+            codigo_maquina.append(format(endereco, '08b'))
+    return codigo_maquina
+
+# Binário para hexadecimal
+def converter_binario_para_hexadecimal(codigo_binario):
+    codigo_binario = codigo_binario.replace(' ', '')
+    return hex(int(codigo_binario, 2))[2:].upper().zfill(2)
+
+# Converter a lista de códigos binários em uma lista de códigos hexadecimais
+def converter_para_hex(codigo_maquina):
+    palavras_hex = []
+    para codigo em codigo_maquina:
+        palavra_hex = converter_binario_para_hexadecimal(codigo)
+        palavras_hex.append(palavra_hex)
+    return palavras_hex
+
+# Escreve o código hexadecimal na saída
+def escrever_arquivo_saida(memoria, caminho):
+    assert len(memoria) <= 256
+    
+    enquanto len(memoria) < 256:
+        memoria.append('00')
+    com open(caminho, 'w') como arquivo_saida:
+        arquivo_saida.write("v3.0 hex words addressed\n")
+        para i em range(len(memoria)):
+            arquivo_saida.write(f'{i:02x}: ')
+            arquivo_saida.write(memoria[i] + "\n")
+
+def montador(arquivo_fonte, caminho_arquivo_saida):
+    linhas = ler_arquivo_fonte(arquivo_fonte)
+    codigo_binario = converter_para_codigo_maquina(linhas)
+    codigo_hex = converter_para_hex(codigo_binario)
+    escrever_arquivo_saida(codigo_hex, caminho_arquivo_saida)
+
+se __name__ == "__main__":
+    arquivo_fonte = sys.argv[1]
+    caminho_arquivo_saida = sys.argv[2]
+    montador(arquivo_fonte, caminho_arquivo_saida)
